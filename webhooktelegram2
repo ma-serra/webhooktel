@@ -1,0 +1,113 @@
+var TELEGRAM_BOT_TOKEN = '6477860014:AAHgEuqy_fY9L0KgtImHPijzYlLmMnaNHhU';
+
+function doGet(e) {
+  return ContentService.createTextOutput("Webhook está funcionando corretamente.");
+}
+
+function doPost(e) {
+  try {
+    var contents = JSON.parse(e.postData.contents);
+    var message = contents.message.text;
+    var chatId = contents.message.chat.id;
+
+    Logger.log('Mensagem recebida: ' + message);
+
+    var responseText = processarMensagem(message);
+    enviarMensagemTelegram(chatId, responseText);
+  } catch (error) {
+    Logger.log('Erro no doPost: ' + error.message);
+    return ContentService.createTextOutput(JSON.stringify({error: error.message})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function processarMensagem(message) {
+  try {
+    // ID da nova planilha
+    var sheet = SpreadsheetApp.openById('1l9ujIIa1zr3KKd62haQz1BmFuc65hmSHAPr-bTPIdqM').getActiveSheet();
+    Logger.log('Planilha acessada com sucesso.');
+
+    var data = sheet.getDataRange().getValues();
+    Logger.log('Dados da planilha: ' + JSON.stringify(data));
+
+    var dados = message.split(' ');
+    if (dados.length < 4) {
+      return 'Por favor, envie a mensagem no formato correto: Nome Email CPF Unidade.';
+    }
+
+    var nome = dados[0].toLowerCase();
+    var email = dados[1].toLowerCase();
+    var cpf = dados[2].toLowerCase();
+    var unidade = dados[3].toLowerCase();
+
+    for (var i = 1; i < data.length; i++) {
+      var nomeData = data[i][1].toLowerCase();
+      var emailData = data[i][4].toLowerCase();
+      var cpfData = data[i][2].toLowerCase();
+      var unidadeData = data[i][0].toLowerCase();
+
+      var matchCount = 0;
+      if (nome === nomeData) matchCount++;
+      if (email === emailData) matchCount++;
+      if (cpf === cpfData) matchCount++;
+      if (unidade === unidadeData) matchCount++;
+
+      if (matchCount >= 3) {
+        return `Olá, ${nomeData}! Unidade: ${unidadeData} verificada. Envie sua selfie e uma foto do documento.`;
+      }
+    }
+
+    return 'Desculpe, não encontramos seus dados. Por favor, verifique suas informações e tente novamente.';
+  } catch (error) {
+    Logger.log('Erro no processarMensagem: ' + error.message);
+    return 'Erro ao processar a mensagem. Tente novamente mais tarde.';
+  }
+}
+
+function enviarMensagemTelegram(chatId, text) {
+  try {
+    var url = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage';
+    var payload = {
+      'chat_id': chatId,
+      'text': text
+    };
+
+    var options = {
+      'method': 'post',
+      'contentType': 'application/json',
+      'payload': JSON.stringify(payload)
+    };
+
+    UrlFetchApp.fetch(url, options);
+    Logger.log('Mensagem enviada para o Telegram: ' + text);
+  } catch (error) {
+    Logger.log('Erro no enviarMensagemTelegram: ' + error.message);
+  }
+}
+
+// Função para testar doPost localmente
+function testDoPost() {
+  var e = {
+    postData: {
+      contents: JSON.stringify({
+        message: {
+          text: "Teste Nome Email CPF Unidade",
+          chat: {
+            id: "12345"
+          }
+        }
+      })
+    }
+  };
+  doPost(e);
+}
+
+// Função para testar acesso à planilha
+function testSheetAccess() {
+  try {
+    var sheet = SpreadsheetApp.openById('1l9ujIIa1zr3KKd62haQz1BmFuc65hmSHAPr-bTPIdqM').getActiveSheet();
+    var data = sheet.getDataRange().getValues();
+    Logger.log(data);
+  } catch (error) {
+    Logger.log('Erro no testSheetAccess: ' + error.message);
+  }
+}
